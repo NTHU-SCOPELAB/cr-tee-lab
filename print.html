@@ -238,8 +238,8 @@ make -j$(nproc)
 <p>圖二：OP-TEE 系統設計</p>
 <p>OP-TEE 是個基於上述概念實作的專案。在這個環境下，應用開發將分為非安全的 client app（CA）和安全的 trusted app（TA）兩部分。 CA 可以使用 ROS 系統呼叫提供一般功能，另外，可以透過 TEE 客戶端 API 與 TEE 交互；TA 則會使用 TEE 內部 API，處理敏感數據與安全操作，如加密、認證等。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="應用開發"><a class="header" href="#應用開發">應用開發</a></h1>
-<p><img src="https://hackmd.io/_uploads/S1cmqLJwlg.png" alt="api_design" />
-圖三：TEE 交互</p>
+<img width="1607" height="1011" alt="image" src="https://github.com/user-attachments/assets/7a1cbe74-291a-46ea-9a66-7b11a451eb42" />
+<p>圖三：TEE 交互</p>
 <p>CA 和 TA 的通訊會依序使用圖三列出的 api，由 CA 主動呼叫，最終調用 TA 對應的函式。</p>
 <ul>
 <li>TEEC_InitializaContext/TA_CreateEntryPoint：TOS 對 TA 進行驗證，然後動態將執行檔載入記憶體</li>
