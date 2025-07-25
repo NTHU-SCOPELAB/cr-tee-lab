@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>使用自己的環境 - TEE LAB</title>
+        <title>執行OP-TEE系統 - TEE LAB</title>
 
 
         <!-- Custom HTML head -->
@@ -175,32 +175,35 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="使用自己的環境"><a class="header" href="#使用自己的環境">使用自己的環境</a></h1>
-<p>因為我們目前只有在Ubuntu 22.04 LTS上測試過，所以如果在其它發行版上執行，可能會有些許差異。</p>
-<h2 id="1-安裝依賴"><a class="header" href="#1-安裝依賴">1. 安裝依賴</a></h2>
-<pre><code class="language-bash">sudo apt update &amp;&amp; apt upgrade -y
-sudo apt install -y adb acpica-tools autoconf automake bc bison build-essential ccache cpio cscope curl device-tree-compiler e2tools expect fastboot flex ftp-upload gdisk git libattr1-dev libcap-ng-dev libfdt-dev libftdi-dev libglib2.0-dev libgmp3-dev libhidapi-dev libmpc-dev libncurses5-dev libpixman-1-dev libslirp-dev libssl-dev libtool libusb-1.0-0-dev make mtools netcat ninja-build python3-cryptography python3-pip python3-pyelftools python3-serial python3-tomli python-is-python3 rsync swig unzip uuid-dev wget xdg-utils xsltproc xterm xz-utils zlib1g-dev
-sudo curl https://storage.googleapis.com/git-repo-downloads/repo &gt; /bin/repo &amp;&amp; chmod a+x /bin/repo
+                        <h1 id="執行op-tee系統"><a class="header" href="#執行op-tee系統">執行OP-TEE系統</a></h1>
+<p>專案建置完成後，可以啟動 qemu 運行 OP-TEE</p>
+<pre><code class="language-shell"># 在 ~/optee/build/
+$ make run-only
 </code></pre>
-<ul>
-<li>註: 這裡安裝的<code>repo</code>是一個命令列工具，它使用 python 封裝 git，用來管理 polyrepo 的專案</li>
-</ul>
-<h2 id="2-下載-op-tee專案的source-code"><a class="header" href="#2-下載-op-tee專案的source-code">2. 下載 OP-TEE專案的source code</a></h2>
-<pre><code class="language-bash">mkdir optee
-cd optee
-repo init -u https://github.com/NTHU-SCOPELAB/cr-tee-manifest.git -m qemu_v8.xml
-repo sync -j$(nproc)
+<p>如果要新增檔案到虛擬機的檔案系統，需要重新執行 buildroot 的建置再啟動 qemu，命令則要改成：</p>
+<pre><code class="language-shell"># 在 ~/optee/build/
+$ make run
+</code></pre>
+<p>接著，輸入 <code>make</code> 的終端會進入 qemu 的 CLI，並且會生成兩個新的終端機，分別是安全世界（Secure World）和正常世界（Normal World）。qemu CLI 會輸出提示等待用戶反應，用戶輸入 c 後，其他的終端會開始輸出 OP-TEE 開機過程的日誌</p>
+<pre><code class="language-shell">(qemu) c
+</code></pre>
+<p>接著在正常世界的終端，可以輸入登入的使用者。完成登入後，就可以執行 OP-TEE 專案包含的測試和範例</p>
+<pre><code class="language-shell"># 測試
+$ xtest
+</code></pre>
+<pre><code class="language-shell"># 範例
+$ optee_example_hello_world
 </code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../setup/use-vm-env.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../lab-1/app-dev.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../setup/build-and-run-optee.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../lab-1/assignment.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -210,11 +213,11 @@ repo sync -j$(nproc)
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../setup/use-vm-env.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../lab-1/app-dev.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../setup/build-and-run-optee.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../lab-1/assignment.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
