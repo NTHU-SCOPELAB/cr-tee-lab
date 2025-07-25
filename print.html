@@ -198,14 +198,6 @@
 <img src="https://github.com/user-attachments/assets/8168913a-6063-4afc-94ec-dcbae7484ccc" alt="image" />
 <img src="https://github.com/user-attachments/assets/d8780cfe-1cde-4f2d-9544-c94588204d2b" alt="image" /></p>
 </details>
-<h2 id="2-開啟vm後執行指令編譯環境"><a class="header" href="#2-開啟vm後執行指令編譯環境">2. 開啟VM後，執行指令編譯環境:</a></h2>
-<pre><code class="language-bash">cd build
-make toolchains -j$(nproc)
-make -j$(nproc)
-</code></pre>
-<ul>
-<li>可能會跑一段時間，經過測試4核心的CPU大約需要1小時左右。</li>
-</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="使用自己的環境"><a class="header" href="#使用自己的環境">使用自己的環境</a></h1>
 <p>因為我們目前只有在Ubuntu 22.04 LTS上測試過，所以如果在其它發行版上執行，可能會有些許差異。</p>
 <h2 id="1-安裝依賴"><a class="header" href="#1-安裝依賴">1. 安裝依賴</a></h2>
@@ -220,16 +212,35 @@ sudo curl https://storage.googleapis.com/git-repo-downloads/repo &gt; /bin/repo 
 <pre><code class="language-bash">mkdir optee
 cd optee
 repo init -u https://github.com/NTHU-SCOPELAB/cr-tee-manifest.git -m qemu_v8.xml
-repo sync
+repo sync -j$(nproc)
 </code></pre>
-<h2 id="3-編譯-op-tee"><a class="header" href="#3-編譯-op-tee">3. 編譯 OP-TEE</a></h2>
-<pre><code class="language-bash">cd build
+<div style="break-before: page; page-break-before: always;"></div><h1 id="編譯並執行op-tee"><a class="header" href="#編譯並執行op-tee">編譯並執行OP-TEE</a></h1>
+<h2 id="1-執行指令編譯環境"><a class="header" href="#1-執行指令編譯環境">1. 執行指令編譯環境:</a></h2>
+<pre><code class="language-bash">cd ~/optee/build
 make toolchains -j$(nproc)
 make -j$(nproc)
 </code></pre>
 <ul>
 <li>可能會跑一段時間，經過測試4核心的CPU大約需要1小時左右。</li>
 </ul>
+<h2 id="2-開啟qemu的op-tee環境"><a class="header" href="#2-開啟qemu的op-tee環境">2. 開啟qemu的OP-TEE環境:</a></h2>
+<p>專案建置完成後，可以啟動 qemu 運行 OP-TEE</p>
+<pre><code class="language-shell"># 在 build/
+$ make run-only
+</code></pre>
+<p>如果要新增檔案到虛擬機的檔案系統，需要重新執行 buildroot 的建置再啟動 qemu，命令則要改成：</p>
+<pre><code class="language-shell">$ make run
+</code></pre>
+<p>接著，輸入 <code>make</code> 的終端會進入 qemu 的 CLI，並且會生成兩個新的終端機，分別是安全世界（Secure World）和正常世界（Normal World）。qemu CLI 會輸出提示等待用戶反應，用戶輸入 c 後，其他的終端會開始輸出 OP-TEE 開機過程的日誌</p>
+<pre><code class="language-shell">(qemu) c
+</code></pre>
+<p>接著在正常世界的終端，可以輸入登入的使用者。完成登入後，就可以執行 OP-TEE 專案包含的測試和範例</p>
+<pre><code class="language-shell"># 測試
+$ xtest
+</code></pre>
+<pre><code class="language-shell"># 範例
+$ optee_example_hello_world
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="系統簡介"><a class="header" href="#系統簡介">系統簡介</a></h1>
 <img alt="image" src="https://github.com/user-attachments/assets/2e80f0ee-8f9d-4af3-95db-c32f9683e51b" />
 <p>圖一：ARM v8 系統設計</p>
@@ -307,8 +318,6 @@ typedef struct {
 <div style="break-before: page; page-break-before: always;"></div><h1 id="實作"><a class="header" href="#實作">實作</a></h1>
 <p>課程提供的 aes 專案位於目錄 aes/。aes 依賴 OP-TEE 的專案，並且 OP-TEE 路徑與 aes/Makefile 相符。專案的結構如下：</p>
 <ul>
-<li>aes/
-<ul>
 <li>host/：CA 的目錄
 <ul>
 <li>Makefile：不能直接使用</li>
@@ -325,14 +334,12 @@ typedef struct {
 <li>Makefile：生成或清除 aes 專案的目標檔案</li>
 <li>...</li>
 </ul>
-</li>
-</ul>
 <p>程式修改完以後，可以在 qemu 內執行測試。首先使用生成目標檔案</p>
-<pre><code class="language-shell"># 在 aes/
+<pre><code class="language-shell"># 在aes專案目錄下
 $ make
 </code></pre>
 <p>然後將檔案放到 buildroot 對應的路徑</p>
-<pre><code class="language-shell"># 在 aes/
+<pre><code class="language-shell"># 在aes專案目錄下
 $ make install
 </code></pre>
 <p>重新執行 buildroot 的建置再啟動 qemu</p>
