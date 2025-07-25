@@ -196,14 +196,6 @@
 <img src="https://github.com/user-attachments/assets/8168913a-6063-4afc-94ec-dcbae7484ccc" alt="image" />
 <img src="https://github.com/user-attachments/assets/d8780cfe-1cde-4f2d-9544-c94588204d2b" alt="image" /></p>
 </details>
-<h2 id="2-編譯op-tee"><a class="header" href="#2-編譯op-tee">2. 編譯OP-TEE</a></h2>
-<pre><code class="language-bash">cd ~/optee/build
-make toolchains -j$(nproc)
-make -j$(nproc)
-</code></pre>
-<ul>
-<li>可能會跑一段時間，經過測試4核心的CPU大約需要1小時左右。</li>
-</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="系統簡介"><a class="header" href="#系統簡介">系統簡介</a></h1>
 <img alt="image" src="https://github.com/user-attachments/assets/2e80f0ee-8f9d-4af3-95db-c32f9683e51b" />
 <p>圖一：ARM v8 系統設計</p>
@@ -276,6 +268,14 @@ typedef struct {
 </div></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="執行op-tee系統"><a class="header" href="#執行op-tee系統">執行OP-TEE系統</a></h1>
+<p>課程提供的 OP-TEE 專案位於目錄 optee/，先建置需要的目標檔案</p>
+<pre><code class="language-bash">$ cd ~/optee/build
+$ make toolchains -j$(nproc)
+$ make -j$(nproc)
+</code></pre>
+<ul>
+<li>可能會跑一段時間，經過測試4核心的CPU大約需要1小時左右。</li>
+</ul>
 <p>專案建置完成後，可以啟動 qemu 運行 OP-TEE</p>
 <pre><code class="language-shell"># 在 ~/optee/build/
 $ make run-only

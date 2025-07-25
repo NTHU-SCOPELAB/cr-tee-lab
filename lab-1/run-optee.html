@@ -176,6 +176,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="執行op-tee系統"><a class="header" href="#執行op-tee系統">執行OP-TEE系統</a></h1>
+<p>課程提供的 OP-TEE 專案位於目錄 optee/，先建置需要的目標檔案</p>
+<pre><code class="language-bash">$ cd ~/optee/build
+$ make toolchains -j$(nproc)
+$ make -j$(nproc)
+</code></pre>
+<ul>
+<li>可能會跑一段時間，經過測試4核心的CPU大約需要1小時左右。</li>
+</ul>
 <p>專案建置完成後，可以啟動 qemu 運行 OP-TEE</p>
 <pre><code class="language-shell"># 在 ~/optee/build/
 $ make run-only
