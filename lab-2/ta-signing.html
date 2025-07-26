@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>其它資源 - TEE LAB</title>
+        <title>TA簽署流程 - TEE LAB</title>
 
 
         <!-- Custom HTML head -->
@@ -175,22 +175,68 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="其它資源"><a class="header" href="#其它資源">其它資源</a></h1>
+                        <h1 id="ta簽署流程"><a class="header" href="#ta簽署流程">TA簽署流程</a></h1>
+<blockquote>
+<p>OP-TEE 文件：<a href="https://optee.readthedocs.io/en/latest/building/trusted_applications.html#signing-of-tas">Signing of TAs</a></p>
+</blockquote>
+<p>所有 REE FS TA 都必須簽章。OP-TEE 的原始碼中，預設包含一把私鑰用於對 TA 簽名，對應的公鑰則會被編進 optee_os 的二進位中。每次載入 TA 時，核心都會用這把公鑰驗證該 TA 的簽章是否合法。</p>
+<div class="warning">
+    原始碼中預設的私鑰僅適用於開發與測試，產品環境的部署應更換為私人的金鑰
+</div>
+<h2 id="簽署相關元件介紹"><a class="header" href="#簽署相關元件介紹">簽署相關元件介紹</a></h2>
+<p>在 optee_os 下有底下元件</p>
 <ul>
-<li>CA 和 TA 範例程式：位於 OP-TEE 專案 optee/optee_examples/</li>
-<li>TEE Client API：<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">DOC</a></li>
-<li>TEE internal API：<a href="https://globalplatform.org/specs-library/tee-internal-core-api-specification/">DOC</a></li>
+<li>keys/default_ta.pem：預設私鑰</li>
+<li>scripts/sign_encrypt.py：用來簽署的腳本。使用說明可以查看</li>
 </ul>
+<pre><code class="language-shell">$ sign_encrypt.py -h
+$ sign_encrypt.py &lt;command&gt; -h
+</code></pre>
+<ul>
+<li>ta/mk/ta_dev_kit.mk：cross compile 的 makefile，用來編譯執行在 optee_os 上 TA，會生成 TA 的 <code>.stripped.elf</code> 和 <code>.ta</code> 檔。</li>
+</ul>
+<div class="warning">
+<p>ta_dev_kit.mk 雖然會生成 <code>.ta</code>，但是簽署的私鑰是採用 default_ta.pem，產品環境需要改以私人金鑰對 <code>.stripped.elf</code> 簽署</p>
+</div>
+<h2 id="簽署操作流程"><a class="header" href="#簽署操作流程">簽署操作流程</a></h2>
+<h4 id="0-在安全環境中產生-rsa-金鑰2048-或-4096-bit並匯出公鑰"><a class="header" href="#0-在安全環境中產生-rsa-金鑰2048-或-4096-bit並匯出公鑰">0. 在安全環境中產生 RSA 金鑰（2048 或 4096 bit）並匯出公鑰</a></h4>
+<pre><code class="language-shell">$ openssl genrsa -out &lt;privkey&gt;.pem 2048
+$ openssl rsa -in &lt;privkey&gt;.pem -pubout -out &lt;pubkey&gt;.pem
+</code></pre>
+<h4 id="1-編譯-op-tee-os-並指定公鑰沒設定-ta_public_key-的情況會自動生成和使用-default_tapem-對應的公鑰"><a class="header" href="#1-編譯-op-tee-os-並指定公鑰沒設定-ta_public_key-的情況會自動生成和使用-default_tapem-對應的公鑰">1. 編譯 OP-TEE OS 並指定公鑰。沒設定 <code>TA_PUBLIC_KEY</code> 的情況會自動生成和使用 default_ta.pem 對應的公鑰</a></h4>
+<pre><code class="language-shell">$ TA_PUBLIC_KEY=&lt;pubkey&gt;.pem make all
+</code></pre>
+<h4 id="2-編譯生成-ta-的-strippedelf"><a class="header" href="#2-編譯生成-ta-的-strippedelf">2. 編譯、生成 TA 的 <code>.stripped.elf</code></a></h4>
+<h4 id="3-設置-uuid-與金鑰變數"><a class="header" href="#3-設置-uuid-與金鑰變數">3. 設置 UUID 與金鑰變數</a></h4>
+<pre><code class="language-shell">$ export TA_SIGN_KEY=&lt;privkey&gt;.pem
+$ export TA_PUBLIC_KEY=&lt;pubkey&gt;.pem
+$ export UUID=&lt;uuid&gt;
+</code></pre>
+<h4 id="4-產生-digest"><a class="header" href="#4-產生-digest">4. 產生 digest</a></h4>
+<pre><code class="language-shell">$ sign_encrypt.py digest --key $TA_PUBLIC_KEY --uuid $UUID \
+    --in $UUID.stripped.elf --dig $UUID.dig
+</code></pre>
+<h4 id="5-離線簽署-digest"><a class="header" href="#5-離線簽署-digest">5. 離線簽署 digest</a></h4>
+<pre><code class="language-shell">$ base64 --decode $UUID.dig | \
+    openssl pkeyutl -sign -inkey $TA_SIGN_KEY \
+    -pkeyopt digest:sha256 -pkeyopt rsa_padding_mode:pss \
+    -pkeyopt rsa_pss_saltlen:digest -pkeyopt rsa_mgf1_md:sha256 | \
+    base64 &gt; $UUID.sig
+</code></pre>
+<h4 id="6-合併-ta-與簽章"><a class="header" href="#6-合併-ta-與簽章">6. 合併 TA 與簽章</a></h4>
+<pre><code class="language-shell">$ sign_encrypt.py stitch --key $TA_PUBLIC_KEY --uuid $UUID \
+    --in $UUID.stripped.elf --sig $UUID.sig --out $UUID.ta
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../lab-1/assignment.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../lab-2/subkey-loading.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../lab-2/intro.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../lab-2/assignment.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -200,11 +246,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../lab-1/assignment.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../lab-2/subkey-loading.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../lab-2/intro.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../lab-2/assignment.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

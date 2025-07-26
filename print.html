@@ -297,6 +297,7 @@ $ optee_example_hello_world
 <div style="break-before: page; page-break-before: always;"></div><h1 id="作業說明"><a class="header" href="#作業說明">作業說明</a></h1>
 <p>本次lab的作業分成實作跟回答問題兩個部份。</p>
 <p>繳交時請把實作執行的部份截圖並說明，連同回答問題的部份打成一個PDF，上傳到eeclass。</p>
+<p>檔名格式請按照: <code>HW1_&lt;學號&gt;</code>。e.g. <code>HW1_113062595</code>。</p>
 <h2 id="1-操作說明"><a class="header" href="#1-操作說明">1. 操作說明</a></h2>
 <p>課程提供的 aes 專案位於目錄<code>~/aes</code>。aes 依賴於前面我們編譯完的 OP-TEE 專案，並且 OP-TEE 路徑與 aes 專案中的Makefile記錄的路徑需相符，否則會無法編譯 aes 專案。
 <img alt="image" src="https://github.com/user-attachments/assets/bb05310f-178e-4ff0-bbf5-d32b41fcebe4" /></p>
@@ -351,6 +352,136 @@ $ make run
 <li>CA 和 TA 範例程式：位於 OP-TEE 專案 optee/optee_examples/</li>
 <li>TEE Client API：<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">DOC</a></li>
 <li>TEE internal API：<a href="https://globalplatform.org/specs-library/tee-internal-core-api-specification/">DOC</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="簡介"><a class="header" href="#簡介">簡介</a></h1>
+<blockquote>
+<p>OP-TEE 文件：<a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#ree-filesystem-ta">REE Filesystem TA</a></p>
+</blockquote>
+<p>TEE 的系統其實需仰賴 TEE 和 REE 協作來運行，舉例來說，物件可以存放在 REE 檔案系統，但在需要信任的情況下，藉由簽名和加密的方式，保證物件的機密性和完整性，確保 TEE 獲取的資源都是可信任。</p>
+<p>實際上，其中一種 TA ---- REE Filesystem TA（REE FS TA）就是將 TA 儲存在REE 檔案系統上。 TA 以 <code>&lt;UUID&gt;.ta</code> 名稱儲存在 REE 的磁碟上，例如 Linux 檔案系統，檔案內容包含 ELF 檔、簽名，並且可以選擇對其加密。這比將 TA 燒錄在 secure flash（如 RPMB 或 secure storage）要靈活許多，特別適合開發階段使用。</p>
+<h2 id="ree-fs-ta-格式"><a class="header" href="#ree-fs-ta-格式">REE FS TA 格式</a></h2>
+<p>共分為以下三種格式：</p>
+<ul>
+<li>Legacy TA：簽章、不加密。自 OP-TEE 3.7.0 起已不支援自動產生
+<pre><code class="language-c">hash = H(&lt;struct shdr&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(hash)
+legacy_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; || &lt;stripped ELF&gt;
+</code></pre>
+</li>
+<li>Bootstrap TA：簽章、不加密
+<pre><code class="language-c">hash = H(&lt;struct shdr&gt; || &lt;struct shdr_bootstrap_ta&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(&lt;hash&gt;)
+bootstrap_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; ||
+                   &lt;struct shdr_bootstrap_ta&gt; || &lt;stripped ELF&gt;
+</code></pre>
+</li>
+<li>Encrypted TA：先進行簽章、加密，再做 MAC 驗證
+<pre><code class="language-c">nonce = &lt;unique random value&gt;
+ciphertext, tag = AES_GCM(&lt;stripped ELF&gt;)
+hash = H(&lt;struct shdr&gt; || &lt;struct shdr_bootstrap_ta&gt; ||
+         &lt;struct shdr_encrypted_ta&gt; || &lt;nonce&gt; || &lt;tag&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(&lt;hash&gt;)
+encrypted_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; ||
+                   &lt;struct shdr_bootstrap_ta&gt; ||
+                   &lt;struct shdr_encrypted_ta&gt; || &lt;nonce&gt; || &lt;tag&gt; ||
+                   &lt;ciphertext&gt;
+</code></pre>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="subkey驗證及載入流程"><a class="header" href="#subkey驗證及載入流程">Subkey驗證及載入流程</a></h1>
+<h2 id="subkey-驗證"><a class="header" href="#subkey-驗證">Subkey 驗證</a></h2>
+<p>OP-TEE 支援使用 <strong>subkey（子金鑰）或 subkey 鏈（chain of subkeys）</strong> 來驗證 TA，這使得可以在不洩漏 root key 的情況下，將簽章權限授予第三方，支援多方獨立簽署 TA。另外，因為子金鑰簽署的 TA 必須位於該子金鑰的 <strong>UUID-V5 命名空間</strong>，這種方式還能防止 TA UUID 混淆，避免 UUID 衝突。</p>
+<h2 id="ree-fs-ta-載入流程"><a class="header" href="#ree-fs-ta-載入流程">REE FS TA 載入流程</a></h2>
+<p>以下為從 REE 載入 REE FS TA 的流程：</p>
+<ol>
+<li>REE 世界的 Client App 請求啟動 TA</li>
+<li>TEE Core 收到請求後，透過 RPC 要求 tee-supplicant 幫忙讀取 TA</li>
+<li>supplicant 根據 UUID 在 <code>/lib/optee_armtz/</code> 中找對應的 <code>.ta</code> 檔案</li>
+<li>supplicant 將整個 <code>.ta</code> 檔案讀入 shared memory，並傳給 TEE Core</li>
+<li>TEE Core 對 TA 映像進行簽章驗證</li>
+<li>驗證通過後，TA 被載入並初始化執行</li>
+</ol>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ta簽署流程"><a class="header" href="#ta簽署流程">TA簽署流程</a></h1>
+<blockquote>
+<p>OP-TEE 文件：<a href="https://optee.readthedocs.io/en/latest/building/trusted_applications.html#signing-of-tas">Signing of TAs</a></p>
+</blockquote>
+<p>所有 REE FS TA 都必須簽章。OP-TEE 的原始碼中，預設包含一把私鑰用於對 TA 簽名，對應的公鑰則會被編進 optee_os 的二進位中。每次載入 TA 時，核心都會用這把公鑰驗證該 TA 的簽章是否合法。</p>
+<div class="warning">
+    原始碼中預設的私鑰僅適用於開發與測試，產品環境的部署應更換為私人的金鑰
+</div>
+<h2 id="簽署相關元件介紹"><a class="header" href="#簽署相關元件介紹">簽署相關元件介紹</a></h2>
+<p>在 optee_os 下有底下元件</p>
+<ul>
+<li>keys/default_ta.pem：預設私鑰</li>
+<li>scripts/sign_encrypt.py：用來簽署的腳本。使用說明可以查看</li>
+</ul>
+<pre><code class="language-shell">$ sign_encrypt.py -h
+$ sign_encrypt.py &lt;command&gt; -h
+</code></pre>
+<ul>
+<li>ta/mk/ta_dev_kit.mk：cross compile 的 makefile，用來編譯執行在 optee_os 上 TA，會生成 TA 的 <code>.stripped.elf</code> 和 <code>.ta</code> 檔。</li>
+</ul>
+<div class="warning">
+<p>ta_dev_kit.mk 雖然會生成 <code>.ta</code>，但是簽署的私鑰是採用 default_ta.pem，產品環境需要改以私人金鑰對 <code>.stripped.elf</code> 簽署</p>
+</div>
+<h2 id="簽署操作流程"><a class="header" href="#簽署操作流程">簽署操作流程</a></h2>
+<h4 id="0-在安全環境中產生-rsa-金鑰2048-或-4096-bit並匯出公鑰"><a class="header" href="#0-在安全環境中產生-rsa-金鑰2048-或-4096-bit並匯出公鑰">0. 在安全環境中產生 RSA 金鑰（2048 或 4096 bit）並匯出公鑰</a></h4>
+<pre><code class="language-shell">$ openssl genrsa -out &lt;privkey&gt;.pem 2048
+$ openssl rsa -in &lt;privkey&gt;.pem -pubout -out &lt;pubkey&gt;.pem
+</code></pre>
+<h4 id="1-編譯-op-tee-os-並指定公鑰沒設定-ta_public_key-的情況會自動生成和使用-default_tapem-對應的公鑰"><a class="header" href="#1-編譯-op-tee-os-並指定公鑰沒設定-ta_public_key-的情況會自動生成和使用-default_tapem-對應的公鑰">1. 編譯 OP-TEE OS 並指定公鑰。沒設定 <code>TA_PUBLIC_KEY</code> 的情況會自動生成和使用 default_ta.pem 對應的公鑰</a></h4>
+<pre><code class="language-shell">$ TA_PUBLIC_KEY=&lt;pubkey&gt;.pem make all
+</code></pre>
+<h4 id="2-編譯生成-ta-的-strippedelf"><a class="header" href="#2-編譯生成-ta-的-strippedelf">2. 編譯、生成 TA 的 <code>.stripped.elf</code></a></h4>
+<h4 id="3-設置-uuid-與金鑰變數"><a class="header" href="#3-設置-uuid-與金鑰變數">3. 設置 UUID 與金鑰變數</a></h4>
+<pre><code class="language-shell">$ export TA_SIGN_KEY=&lt;privkey&gt;.pem
+$ export TA_PUBLIC_KEY=&lt;pubkey&gt;.pem
+$ export UUID=&lt;uuid&gt;
+</code></pre>
+<h4 id="4-產生-digest"><a class="header" href="#4-產生-digest">4. 產生 digest</a></h4>
+<pre><code class="language-shell">$ sign_encrypt.py digest --key $TA_PUBLIC_KEY --uuid $UUID \
+    --in $UUID.stripped.elf --dig $UUID.dig
+</code></pre>
+<h4 id="5-離線簽署-digest"><a class="header" href="#5-離線簽署-digest">5. 離線簽署 digest</a></h4>
+<pre><code class="language-shell">$ base64 --decode $UUID.dig | \
+    openssl pkeyutl -sign -inkey $TA_SIGN_KEY \
+    -pkeyopt digest:sha256 -pkeyopt rsa_padding_mode:pss \
+    -pkeyopt rsa_pss_saltlen:digest -pkeyopt rsa_mgf1_md:sha256 | \
+    base64 &gt; $UUID.sig
+</code></pre>
+<h4 id="6-合併-ta-與簽章"><a class="header" href="#6-合併-ta-與簽章">6. 合併 TA 與簽章</a></h4>
+<pre><code class="language-shell">$ sign_encrypt.py stitch --key $TA_PUBLIC_KEY --uuid $UUID \
+    --in $UUID.stripped.elf --sig $UUID.sig --out $UUID.ta
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="作業說明-1"><a class="header" href="#作業說明-1">作業說明</a></h1>
+<p>本次lab的作業分成實作跟回答問題兩個部份。</p>
+<p>繳交時請把實作執行的部份截圖並說明，連同回答問題的部份打成一個PDF，上傳到eeclass。</p>
+<p>檔名格式請按照: <code>HW2_&lt;學號&gt;</code>。e.g. <code>HW2_113062595</code>。</p>
+<h2 id="實作"><a class="header" href="#實作">實作</a></h2>
+<ul>
+<li>
+<p>使用下方的 UUID 修改 LAB 1 的 aes 專案，並根據<a href="lab-2/ta-signing.html">簽署操作流程</a>再次生成 <code>.ta</code> (需逐步截圖)。</p>
+</li>
+<li>
+<p>私鑰使用 default_ta.pem，因此 OP-TEE OS 可以不用重新編譯</p>
+<pre><code>// 修改~/aes/ta/Makefile中的BINARY (檔名)
+aed564f1-960e-4117-8bb4-417b4e79c130
+
+// 在~/aes/ta/user_ta_header_defines.h中修改TA_UUID (寫入ELF的UUID)
+#define TA_UUID
+    { 0xaed564f1, 0x960e, 0x4117, \
+        { 0x8b, 0xb4, 0x41, 0x7b, 0x4e, 0x79, 0xc1, 0x30} }
+
+</code></pre>
+<p>紀錄以下兩個命令的輸出結果</p>
+</li>
+</ul>
+<pre><code class="language-shell">$ sign_encrypt.py display --in &lt;.ta&gt;
+$ sign_encrypt.py verify --uuid &lt;uuid&gt; --in &lt;.ta&gt; --key &lt;default_ta.pem&gt;
+</code></pre>
+<h2 id="問題"><a class="header" href="#問題">問題</a></h2>
+<ul>
+<li>參考 <a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#verifying-with-subkeys">1</a>、<a href="https://optee.readthedocs.io/en/latest/architecture/subkeys.html#subkeys">2</a> 說明 subkeys 機制、流程</li>
 </ul>
 
                     </main>

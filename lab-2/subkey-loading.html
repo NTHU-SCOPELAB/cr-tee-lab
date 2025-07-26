@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>其它資源 - TEE LAB</title>
+        <title>Subkey驗證及載入流程 - TEE LAB</title>
 
 
         <!-- Custom HTML head -->
@@ -175,22 +175,29 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="其它資源"><a class="header" href="#其它資源">其它資源</a></h1>
-<ul>
-<li>CA 和 TA 範例程式：位於 OP-TEE 專案 optee/optee_examples/</li>
-<li>TEE Client API：<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">DOC</a></li>
-<li>TEE internal API：<a href="https://globalplatform.org/specs-library/tee-internal-core-api-specification/">DOC</a></li>
-</ul>
+                        <h1 id="subkey驗證及載入流程"><a class="header" href="#subkey驗證及載入流程">Subkey驗證及載入流程</a></h1>
+<h2 id="subkey-驗證"><a class="header" href="#subkey-驗證">Subkey 驗證</a></h2>
+<p>OP-TEE 支援使用 <strong>subkey（子金鑰）或 subkey 鏈（chain of subkeys）</strong> 來驗證 TA，這使得可以在不洩漏 root key 的情況下，將簽章權限授予第三方，支援多方獨立簽署 TA。另外，因為子金鑰簽署的 TA 必須位於該子金鑰的 <strong>UUID-V5 命名空間</strong>，這種方式還能防止 TA UUID 混淆，避免 UUID 衝突。</p>
+<h2 id="ree-fs-ta-載入流程"><a class="header" href="#ree-fs-ta-載入流程">REE FS TA 載入流程</a></h2>
+<p>以下為從 REE 載入 REE FS TA 的流程：</p>
+<ol>
+<li>REE 世界的 Client App 請求啟動 TA</li>
+<li>TEE Core 收到請求後，透過 RPC 要求 tee-supplicant 幫忙讀取 TA</li>
+<li>supplicant 根據 UUID 在 <code>/lib/optee_armtz/</code> 中找對應的 <code>.ta</code> 檔案</li>
+<li>supplicant 將整個 <code>.ta</code> 檔案讀入 shared memory，並傳給 TEE Core</li>
+<li>TEE Core 對 TA 映像進行簽章驗證</li>
+<li>驗證通過後，TA 被載入並初始化執行</li>
+</ol>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../lab-1/assignment.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../lab-2/intro.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../lab-2/intro.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../lab-2/ta-signing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -200,11 +207,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../lab-1/assignment.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../lab-2/intro.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../lab-2/intro.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../lab-2/ta-signing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

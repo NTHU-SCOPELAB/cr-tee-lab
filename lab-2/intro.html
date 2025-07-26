@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>其它資源 - TEE LAB</title>
+        <title>簡介 - TEE LAB</title>
 
 
         <!-- Custom HTML head -->
@@ -175,22 +175,51 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="其它資源"><a class="header" href="#其它資源">其它資源</a></h1>
+                        <h1 id="簡介"><a class="header" href="#簡介">簡介</a></h1>
+<blockquote>
+<p>OP-TEE 文件：<a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#ree-filesystem-ta">REE Filesystem TA</a></p>
+</blockquote>
+<p>TEE 的系統其實需仰賴 TEE 和 REE 協作來運行，舉例來說，物件可以存放在 REE 檔案系統，但在需要信任的情況下，藉由簽名和加密的方式，保證物件的機密性和完整性，確保 TEE 獲取的資源都是可信任。</p>
+<p>實際上，其中一種 TA ---- REE Filesystem TA（REE FS TA）就是將 TA 儲存在REE 檔案系統上。 TA 以 <code>&lt;UUID&gt;.ta</code> 名稱儲存在 REE 的磁碟上，例如 Linux 檔案系統，檔案內容包含 ELF 檔、簽名，並且可以選擇對其加密。這比將 TA 燒錄在 secure flash（如 RPMB 或 secure storage）要靈活許多，特別適合開發階段使用。</p>
+<h2 id="ree-fs-ta-格式"><a class="header" href="#ree-fs-ta-格式">REE FS TA 格式</a></h2>
+<p>共分為以下三種格式：</p>
 <ul>
-<li>CA 和 TA 範例程式：位於 OP-TEE 專案 optee/optee_examples/</li>
-<li>TEE Client API：<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">DOC</a></li>
-<li>TEE internal API：<a href="https://globalplatform.org/specs-library/tee-internal-core-api-specification/">DOC</a></li>
+<li>Legacy TA：簽章、不加密。自 OP-TEE 3.7.0 起已不支援自動產生
+<pre><code class="language-c">hash = H(&lt;struct shdr&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(hash)
+legacy_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; || &lt;stripped ELF&gt;
+</code></pre>
+</li>
+<li>Bootstrap TA：簽章、不加密
+<pre><code class="language-c">hash = H(&lt;struct shdr&gt; || &lt;struct shdr_bootstrap_ta&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(&lt;hash&gt;)
+bootstrap_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; ||
+                   &lt;struct shdr_bootstrap_ta&gt; || &lt;stripped ELF&gt;
+</code></pre>
+</li>
+<li>Encrypted TA：先進行簽章、加密，再做 MAC 驗證
+<pre><code class="language-c">nonce = &lt;unique random value&gt;
+ciphertext, tag = AES_GCM(&lt;stripped ELF&gt;)
+hash = H(&lt;struct shdr&gt; || &lt;struct shdr_bootstrap_ta&gt; ||
+         &lt;struct shdr_encrypted_ta&gt; || &lt;nonce&gt; || &lt;tag&gt; || &lt;stripped ELF&gt;)
+signature = RSA-Sign(&lt;hash&gt;)
+encrypted_binary = &lt;struct shdr&gt; || &lt;hash&gt; || &lt;signature&gt; ||
+                   &lt;struct shdr_bootstrap_ta&gt; ||
+                   &lt;struct shdr_encrypted_ta&gt; || &lt;nonce&gt; || &lt;tag&gt; ||
+                   &lt;ciphertext&gt;
+</code></pre>
+</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../lab-1/assignment.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../lab-1/resources.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../lab-2/intro.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../lab-2/subkey-loading.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -200,11 +229,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../lab-1/assignment.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../lab-1/resources.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../lab-2/intro.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../lab-2/subkey-loading.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
