@@ -295,11 +295,10 @@ $ xtest
 $ optee_example_hello_world
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="作業說明"><a class="header" href="#作業說明">作業說明</a></h1>
-<p>本次lab的作業分成實作跟回答問題兩個部份。</p>
-<p>繳交時請把實作執行的部份截圖並說明，連同回答問題的部份打成一個PDF，上傳到eeclass。</p>
+<p>本次作業分為實作與簡答兩部分。繳交時，實作部分只需要截圖表示；回答問題時，需簡要說明答案思路。最後，將兩部分合併為一份 PDF，上傳至 eeclass。</p>
 <p>檔名格式請按照: <code>HW1_&lt;學號&gt;</code>。e.g. <code>HW1_113062595</code>。</p>
-<h2 id="1-操作說明"><a class="header" href="#1-操作說明">1. 操作說明</a></h2>
-<p>課程提供的 aes 專案位於目錄<code>~/aes</code>。aes 依賴於前面我們編譯完的 OP-TEE 專案，並且 OP-TEE 路徑與 aes 專案中的Makefile記錄的路徑需相符，否則會無法編譯 aes 專案。
+<h2 id="實作"><a class="header" href="#實作">實作</a></h2>
+<p>課程提供的 aes 專案位於目錄<code>~/aes</code>。aes 依賴於前面我們編譯完的 OP-TEE 專案，並且 aes/Makefile 需要設定 OP-TEE 的正確路徑，否則會無法編譯 aes 專案。
 <img alt="image" src="https://github.com/user-attachments/assets/bb05310f-178e-4ff0-bbf5-d32b41fcebe4" /></p>
 <p>aes 專案的結構如下：</p>
 <ul>
@@ -339,13 +338,13 @@ $ make run
 <p>在Normal World中登入之後，應該就會出現下列指令可以使用來測試我們修改完的 aes 專案:</p>
 <pre><code class="language-shell">$ optee_example_aes
 </code></pre>
-<h2 id="2-回答問題"><a class="header" href="#2-回答問題">2. 回答問題</a></h2>
+<h2 id="簡答"><a class="header" href="#簡答">簡答</a></h2>
 <ul>
-<li>說明 aes 程式修改的部分</li>
-<li>說明 aes CA 程式流程</li>
-<li>key/op handle api 流程？程式內對應呼叫的地方？</li>
-<li>TA_InvokeCommandEntryPoint 最多能傳入幾個 32 bit 的參數？</li>
-<li>CA 和 TA 的共享記憶體應該屬於安全還是非安全的記憶體？</li>
+<li>提供 <code>$ optee_example_aes</code> 的執行輸出的截圖。</li>
+<li>說明 aes 實作部分，修改的程式目的是什麼？以及如何依據 <code>ta/include/aes_ta.h</code> 內容進行修改？</li>
+<li>說明 aes CA 的程式流程，每個步驟是如何操作 TA？</li>
+<li>參考 <a href="https://globalplatform.org/specs-library/tee-internal-core-api-specification/">api 文件</a>，說明 aes TA 使用 key/operation handle 的時候，呼叫 api 的流程以及使用的參數。</li>
+<li>OP-TEE 支援 Value parameter, Memory reference 中哪些形式的參數？ TA_InvokeCommandEntryPoint 的 Value parameter 最多能傳入幾個 32-bit 的參數</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="其它資源"><a class="header" href="#其它資源">其它資源</a></h1>
 <ul>
@@ -454,34 +453,55 @@ $ export UUID=&lt;uuid&gt;
     --in $UUID.stripped.elf --sig $UUID.sig --out $UUID.ta
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="作業說明-1"><a class="header" href="#作業說明-1">作業說明</a></h1>
-<p>本次lab的作業分成實作跟回答問題兩個部份。</p>
-<p>繳交時請把實作執行的部份截圖並說明，連同回答問題的部份打成一個PDF，上傳到eeclass。</p>
+<p>本次作業分為實作與簡答兩部分。繳交時，實作部分只需要截圖表示；回答問題時，需簡要說明答案思路。最後，將兩部分合併為一份 PDF，上傳至 eeclass。</p>
 <p>檔名格式請按照: <code>HW2_&lt;學號&gt;</code>。e.g. <code>HW2_113062595</code>。</p>
-<h2 id="實作"><a class="header" href="#實作">實作</a></h2>
+<h2 id="實作-1"><a class="header" href="#實作-1">實作</a></h2>
+<p>aes 專案的結構如下：</p>
 <ul>
-<li>
-<p>使用下方的 UUID 修改 LAB 1 的 aes 專案，並根據<a href="lab-2/ta-signing.html">簽署操作流程</a>再次生成 <code>.ta</code> (需逐步截圖)。</p>
+<li>host/：CA 的目錄
+<ul>
+<li>...</li>
+</ul>
 </li>
-<li>
-<p>私鑰使用 default_ta.pem，因此 OP-TEE OS 可以不用重新編譯</p>
-<pre><code>// 修改~/aes/ta/Makefile中的BINARY (檔名)
-aed564f1-960e-4117-8bb4-417b4e79c130
+<li>ta/：TA 的目錄
+<ul>
+<li>include/
+<ul>
+<li>aes_ta.h：修改 TA_AES_UUID</li>
+</ul>
+</li>
+<li>Makefile：修改 BINARY</li>
+<li>...</li>
+</ul>
+</li>
+<li>...</li>
+</ul>
+<p>使用下方的 UUID 修改 LAB 1 的 aes 專案</p>
+<pre><code>aed564f1-960e-4117-8bb4-417b4e79c130
 
-// 在~/aes/ta/user_ta_header_defines.h中修改TA_UUID (寫入ELF的UUID)
 #define TA_UUID
     { 0xaed564f1, 0x960e, 0x4117, \
         { 0x8b, 0xb4, 0x41, 0x7b, 0x4e, 0x79, 0xc1, 0x30} }
 
 </code></pre>
-<p>紀錄以下兩個命令的輸出結果</p>
-</li>
-</ul>
+<p>根據<a href="lab-2/ta-signing.html">簽署操作流程</a>生成 <code>.ta</code>。私鑰使用 default_ta.pem，因此「編譯 OP-TEE OS」的步驟可以跳過。</p>
+<h2 id="簡答-1"><a class="header" href="#簡答-1">簡答</a></h2>
+<ul>
+<li>
+<p>提供簽署過程的截圖，包含所有終端執行的命令，以及 sign_encrypt.py 兩個命令的輸出。</p>
 <pre><code class="language-shell">$ sign_encrypt.py display --in &lt;.ta&gt;
 $ sign_encrypt.py verify --uuid &lt;uuid&gt; --in &lt;.ta&gt; --key &lt;default_ta.pem&gt;
 </code></pre>
-<h2 id="問題"><a class="header" href="#問題">問題</a></h2>
+</li>
+<li>
+<p>參考文件 <a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#verifying-with-subkeys">1</a>、<a href="https://optee.readthedocs.io/en/latest/architecture/subkeys.html#subkeys">2</a>，說明 subkeys 機制、流程。</p>
+</li>
+</ul>
+<p>參考<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">客戶 api</a>第三章底下的相關章節，回答以下問題：</p>
 <ul>
-<li>參考 <a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#verifying-with-subkeys">1</a>、<a href="https://optee.readthedocs.io/en/latest/architecture/subkeys.html#subkeys">2</a> 說明 subkeys 機制、流程</li>
+<li>CA 與 TA 使用的共享記憶體屬於安全記憶體還是非安全記憶體？</li>
+<li>共享記憶體區塊是否可以在多個會話（Sessions）中重複使用？</li>
+<li>TEEC_AllocateSharedMemory、TEEC_RegisterSharedMemory 和 TEEC_TempMemoryReference 三種記憶體，可以實現 zero-copy 的機會從高到低排序是？</li>
 </ul>
 
                     </main>
