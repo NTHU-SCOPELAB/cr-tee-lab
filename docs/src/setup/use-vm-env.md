@@ -1,7 +1,7 @@
 # 使用凖備好的VM
 
 ## 1. 下載VM映像檔，並匯入virtualbox:
-- https://github.com/NTHU-SCOPELAB/cr-tee-lab/releases/latest
+- [https://github.com/NTHU-SCOPELAB/cr-tee-lab/releases/latest](https://github.com/NTHU-SCOPELAB/cr-tee-lab/releases/latest)
 - 使用者帳號: `ubuntu`
 - 使用者密碼: `ubuntu`
 - 下載所有zip檔之後解壓就可以得到一個ova檔，再進行匯入即可。
