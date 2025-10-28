@@ -202,6 +202,30 @@ $ xtest
 <pre><code class="language-shell"># 範例
 $ optee_example_hello_world
 </code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<ul>
+<li>OP-TEE專案所引用的其中一個repo有dependency的<a href="https://github.com/apache/teaclave-trustzone-sdk/issues/240">問題</a>，可能會導致在重新編譯時會出現錯誤訊息。</li>
+<li>由於我們有更新了optee專案的抓取來源，因此可以透過以下方式解決這個問題:
+<ul>
+<li>
+<ol>
+<li><a href="https://github.com/NTHU-SCOPELAB/cr-tee-lab/releases/latest">下載</a>最新的VM映像檔並重新建立開發環境</li>
+</ol>
+</li>
+<li>
+<ol start="2">
+<li>或是透過以下指令重新抓取OPTEE的source code</li>
+</ol>
+<pre><code class="language-bash">#在optee目錄~/optee下
+rm -rf ~/optee/.repo
+repo init -u https://github.com/NTHU-SCOPELAB/cr-tee-manifest.git -m qemu_v8.xml
+repo sync ~/optee/optee_rust
+</code></pre>
+</li>
+</ul>
+</li>
+<li>完成後繼續按<a href="run-optee.html">教學</a>的指示執行編譯系統的步驟即可。</li>
+</ul>
 
                     </main>
 
