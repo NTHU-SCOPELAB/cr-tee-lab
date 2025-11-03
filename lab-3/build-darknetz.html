@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>作業說明 - TEE LAB</title>
+        <title>建置DarkneTZ - TEE LAB</title>
 
 
         <!-- Custom HTML head -->
@@ -175,67 +175,44 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="作業說明"><a class="header" href="#作業說明">作業說明</a></h1>
-<p>本次作業分為實作與簡答兩部分。繳交時，實作部分只需要截圖表示；回答問題時，需簡要說明答案思路。最後，將兩部分合併為一份 PDF，上傳至 eeclass。</p>
-<p>檔名格式請按照: <code>HW2_&lt;學號&gt;</code>。e.g. <code>HW2_113062595</code>。</p>
-<h2 id="實作"><a class="header" href="#實作">實作</a></h2>
-<p>aes 專案的結構如下：</p>
-<ul>
-<li>host/：CA 的目錄
-<ul>
-<li>...</li>
-</ul>
-</li>
-<li>ta/：TA 的目錄
-<ul>
-<li>include/
-<ul>
-<li>aes_ta.h：修改 TA_AES_UUID</li>
-</ul>
-</li>
-<li>Makefile：修改 BINARY</li>
-<li>...</li>
-</ul>
-</li>
-<li>...</li>
-</ul>
-<p>使用下方的 UUID 修改 LAB 1 的 aes 專案</p>
-<pre><code>aed564f1-960e-4117-8bb4-417b4e79c130
-
-#define TA_UUID
-    { 0xaed564f1, 0x960e, 0x4117, \
-        { 0x8b, 0xb4, 0x41, 0x7b, 0x4e, 0x79, 0xc1, 0x30} }
-
+                        <h1 id="建置darknetz"><a class="header" href="#建置darknetz">建置DarkneTZ</a></h1>
+<h2 id="darknetz介紹"><a class="header" href="#darknetz介紹">DarkneTZ介紹</a></h2>
+<p><a href="https://github.com/mofanv/darknetz/blob/master/README.md">DarkneTZ</a> 提出一個方案，將 DNN 模型部署於 OP-TEE 系統中，如此一來，便可在不犧牲機密性的前提下，執行模型的訓練與推論。</p>
+<h2 id="建置步驟"><a class="header" href="#建置步驟">建置步驟</a></h2>
+<h4 id="1複製程式碼與資料集"><a class="header" href="#1複製程式碼與資料集">1.複製程式碼與資料集</a></h4>
+<pre><code class="language-bash">git clone https://github.com/NTHU-SCOPELAB/cr-tee-darknetz.git
+git clone https://github.com/NTHU-SCOPELAB/cr-tee-darknetz-dataset.git
 </code></pre>
-<p>根據<a href="ta-signing.html">簽署操作流程</a>生成 <code>.ta</code>。私鑰使用 default_ta.pem，因此「編譯 OP-TEE OS」的步驟可以跳過。</p>
-<h2 id="簡答"><a class="header" href="#簡答">簡答</a></h2>
-<ul>
-<li>
-<p>提供簽署過程的截圖，包含所有終端執行的命令，以及 sign_encrypt.py 兩個命令的輸出。</p>
-<pre><code class="language-shell">$ sign_encrypt.py display --in &lt;.ta&gt;
-$ sign_encrypt.py verify --uuid &lt;uuid&gt; --in &lt;.ta&gt; --key &lt;default_ta.pem&gt;
+<h4 id="2將程式碼放到example資料夾下"><a class="header" href="#2將程式碼放到example資料夾下">2.將程式碼放到example資料夾下</a></h4>
+<p><code>$PATH_darknetz$</code>為<code>cr-tee-darknetz</code>所在的路徑</p>
+<pre><code class="language-bash">mkdir ~/optee/optee_examples/darknetz
+cp -a $PATH_darknetz$/. ~/optee/optee_examples/darknetz/
 </code></pre>
-</li>
-<li>
-<p>參考文件 <a href="https://optee.readthedocs.io/en/latest/architecture/trusted_applications.html#verifying-with-subkeys">1</a>、<a href="https://optee.readthedocs.io/en/latest/architecture/subkeys.html#subkeys">2</a>，說明 subkeys 機制、流程。</p>
-</li>
-</ul>
-<p>參考<a href="https://globalplatform.org/specs-library/tee-client-api-specification/">客戶 api</a>第三章底下的相關章節，回答以下問題：</p>
-<ul>
-<li>CA 與 TA 使用的共享記憶體屬於安全記憶體還是非安全記憶體？</li>
-<li>共享記憶體區塊是否可以在多個會話（Sessions）中重複使用？</li>
-<li>TEEC_AllocateSharedMemory、TEEC_RegisterSharedMemory 和 TEEC_TempMemoryReference 三種記憶體，可以實現 zero-copy 的機會從高到低排序是？</li>
-</ul>
+<h4 id="3將datasets放到root下"><a class="header" href="#3將datasets放到root下">3.將datasets放到root下</a></h4>
+<p><code>$PATH_tz_datasets$</code>為<code>cr-tee-darknetz-dataset</code>所在的路徑，~/optee/out-br/target/root/ 則會作為 REE rootfs 的內容來源</p>
+<pre><code class="language-bash">cp -a $PATH_tz_datasets$/. ~/optee/out-br/target/root/
+</code></pre>
+<h4 id="4測試"><a class="header" href="#4測試">4.測試</a></h4>
+<pre><code class="language-bash">cd ~/optee/build
+make run
+</code></pre>
+<pre><code class="language-bash">#In Normal World
+buildroot login: root
+darknetp
+</code></pre>
+<p>如果執行結果像下面這樣表示建置成功</p>
+<pre><code class="language-bash"># usage: ./darknetp &lt;function&gt;
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../lab-2/ta-signing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../lab-2/assignment.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../lab-3/build-darknetz.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../lab-3/encrypt-weights.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -245,11 +222,11 @@ $ sign_encrypt.py verify --uuid &lt;uuid&gt; --in &lt;.ta&gt; --key &lt;default_
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../lab-2/ta-signing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../lab-2/assignment.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../lab-3/build-darknetz.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../lab-3/encrypt-weights.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

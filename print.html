@@ -527,6 +527,227 @@ $ sign_encrypt.py verify --uuid &lt;uuid&gt; --in &lt;.ta&gt; --key &lt;default_
 <li>共享記憶體區塊是否可以在多個會話（Sessions）中重複使用？</li>
 <li>TEEC_AllocateSharedMemory、TEEC_RegisterSharedMemory 和 TEEC_TempMemoryReference 三種記憶體，可以實現 zero-copy 的機會從高到低排序是？</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="建置darknetz"><a class="header" href="#建置darknetz">建置DarkneTZ</a></h1>
+<h2 id="darknetz介紹"><a class="header" href="#darknetz介紹">DarkneTZ介紹</a></h2>
+<p><a href="https://github.com/mofanv/darknetz/blob/master/README.md">DarkneTZ</a> 提出一個方案，將 DNN 模型部署於 OP-TEE 系統中，如此一來，便可在不犧牲機密性的前提下，執行模型的訓練與推論。</p>
+<h2 id="建置步驟"><a class="header" href="#建置步驟">建置步驟</a></h2>
+<h4 id="1複製程式碼與資料集"><a class="header" href="#1複製程式碼與資料集">1.複製程式碼與資料集</a></h4>
+<pre><code class="language-bash">git clone https://github.com/NTHU-SCOPELAB/cr-tee-darknetz.git
+git clone https://github.com/NTHU-SCOPELAB/cr-tee-darknetz-dataset.git
+</code></pre>
+<h4 id="2將程式碼放到example資料夾下"><a class="header" href="#2將程式碼放到example資料夾下">2.將程式碼放到example資料夾下</a></h4>
+<p><code>$PATH_darknetz$</code>為<code>cr-tee-darknetz</code>所在的路徑</p>
+<pre><code class="language-bash">mkdir ~/optee/optee_examples/darknetz
+cp -a $PATH_darknetz$/. ~/optee/optee_examples/darknetz/
+</code></pre>
+<h4 id="3將datasets放到root下"><a class="header" href="#3將datasets放到root下">3.將datasets放到root下</a></h4>
+<p><code>$PATH_tz_datasets$</code>為<code>cr-tee-darknetz-dataset</code>所在的路徑，~/optee/out-br/target/root/ 則會作為 REE rootfs 的內容來源</p>
+<pre><code class="language-bash">cp -a $PATH_tz_datasets$/. ~/optee/out-br/target/root/
+</code></pre>
+<h4 id="4測試"><a class="header" href="#4測試">4.測試</a></h4>
+<pre><code class="language-bash">cd ~/optee/build
+make run
+</code></pre>
+<pre><code class="language-bash">#In Normal World
+buildroot login: root
+darknetp
+</code></pre>
+<p>如果執行結果像下面這樣表示建置成功</p>
+<pre><code class="language-bash"># usage: ./darknetp &lt;function&gt;
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="加密權重"><a class="header" href="#加密權重">加密權重</a></h1>
+<p>為了防止模型資訊遭竊，部署在 TA 中的模型權重應先加密，並在載入至 TEE 時才進行解密。cr-tee-darknetz-dataset 底下提供未加密的權重 models/mnist/mnist_lenet_ta.weights，如果想再 TEE 裏面執行模型，需要使用加密過的 .weight 檔。</p>
+<p>權重處理的正常流程如下：TA 接收權重 → 解密權重 → 運行模型 → 加密權重 → 發送權重。底下是加密權重的間接方法，首先將未加密的權重直接傳送給 TA。同時，我們註解用於解密權重的 <code>load_weight_TA</code> 程式碼。然後省略「運行模型」的步驟，TA 直接對權重加密，將加密後的權重發送回 CA 保存在 models/mnist/mnist_lenet_ta.weights。</p>
+<h2 id="權重加密步驟"><a class="header" href="#權重加密步驟">權重加密步驟</a></h2>
+<p>cr-tee-darknetz專案的結構如下：</p>
+<ul>
+<li>host/：CA 的目錄
+<ul>
+<li>examples
+<ul>
+<li>classifier.c</li>
+<li>...</li>
+</ul>
+</li>
+<li>...</li>
+</ul>
+</li>
+<li>ta/：TA 的目錄
+<ul>
+<li>parser_TA.c</li>
+<li>...</li>
+</ul>
+</li>
+<li>...</li>
+</ul>
+<h4 id="1-cr-tee-darknetz-程式碼新增和修改"><a class="header" href="#1-cr-tee-darknetz-程式碼新增和修改">1. cr-tee-darknetz 程式碼新增和修改</a></h4>
+<p>將<code>parser_TA.c</code>檔案中的<code>load_weights_TA</code>呼叫<code>aes_cbc_TA</code>的部分註解掉</p>
+<pre><code class="language-C">void load_weights_TA(float *vec, int length, int layer_i, char type, int transpose)
+{
+    /*
+        ...
+    */
+    //aes_cbc_TA("decrypt", tempvec, length);
+    /*
+        ...
+    */
+}
+</code></pre>
+<p>在<code>classifier.c</code>檔案中新增 function <code>convert_weights_to_TA</code>，發送、接收權重並且保存加密後的 .weight 檔</p>
+<pre><code class="language-C">void convert_weights_to_TA(char* datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
+{
+        int i;
+        char *base = basecfg(cfgfile);
+        network **nets = calloc(ngpus, sizeof(network*));
+
+        int seed = rand();
+        // load network into GPU(s)
+        for(i = 0; i &lt; ngpus; ++i) {
+                srand(seed);
+#ifdef GPU
+        cuda_set_device(gpus[i]);
+#endif
+        nets[i] = load_network(cfgfile, weightfile, clear);
+        }
+
+        network *net = nets[0];
+        char buff[256];
+        sprintf(buff, "models/mnist/%s_ta.weights", base);
+        save_weights(net, buff);
+        free_network(net);
+        free(base);
+}
+</code></pre>
+<p>在 function <code>run_classifier</code>中新增呼叫<code>convert_weights_to_TA</code>的程式</p>
+<pre><code class="language-C">void run_classifier(int argc, char **argv)
+{
+    /*
+		...
+    */
+    // 新增
+    else if(0==strcmp(argv[2], "move")) convert_weights_to_TA(data, cfg, weights, gpus, ngpus, clear);
+}
+</code></pre>
+<h4 id="2-啟用-qemu-模擬-op-tee-並開啟-host-guest-folder-sharing"><a class="header" href="#2-啟用-qemu-模擬-op-tee-並開啟-host-guest-folder-sharing">2. 啟用 QEMU 模擬 OP-TEE ，並開啟 Host-Guest folder sharing</a></h4>
+<p>因為 qemu 沒有啟用硬碟，Normal World 新增的 .weights 檔案重開機後就會喪失，所以要用
+<a href="https://optee.readthedocs.io/en/latest/building/devices/qemu.html#host-guest-folder-sharing">Host-Guest folder sharing</a> 保存到宿主的目錄。</p>
+<p><code>make run</code> 加入底下參數，新增名為 host 的共享裝置到客戶機，對應宿主機的 ~/optee 目錄</p>
+<pre><code class="language-sh">cd ~/optee/build
+make QEMU_VIRTFS_ENABLE=y QEMU_USERNET_ENABLE=y run
+</code></pre>
+<p>使用 <code>mount</code> 掛載裝置到客戶的 /mnt/host 目錄</p>
+<pre><code class="language-sh"># In normal world
+buildroot login: root
+mkdir -p /mnt/host
+mount -t 9p -o trans=virtio host /mnt/host
+</code></pre>
+<h4 id="3-執行-ca-進行權重加密"><a class="header" href="#3-執行-ca-進行權重加密">3. 執行 CA 進行權重加密</a></h4>
+<p><code>pp_start</code>和<code>pp_end</code>分別表示開始及結束放入TA的層</p>
+<pre><code class="language-sh">darknetp classifier move -pp_start 0 -pp_end 10 cfg/mnist.dataset cfg/mnist_lenet.cfg models/mnist/mnist_lenet.weights
+</code></pre>
+<h4 id="4-將加密的權重檔複製到宿主的目錄"><a class="header" href="#4-將加密的權重檔複製到宿主的目錄">4. 將加密的權重檔複製到宿主的目錄</a></h4>
+<p>保存在 /mnt/host/out-br/target/root/ 底下，就是對應宿主中用來存放 REE rootfs 的目錄 ~/optee/out-br/target/root/</p>
+<pre><code class="language-sh">cp models/mnist/mnist_lenet_ta.weights /mnt/host/out-br/target/root/models/mnist
+</code></pre>
+<h4 id="6-還原-cr-tee-darknetz-程式碼修改"><a class="header" href="#6-還原-cr-tee-darknetz-程式碼修改">6. 還原 cr-tee-darknetz 程式碼修改</a></h4>
+<p>將<code>parser_TA.c</code>檔案的<code>load_weights_TA</code>中的<code>aes_cbc_TA</code>註解取消</p>
+<pre><code class="language-C">void load_weights_TA(float *vec, int length, int layer_i, char type, int transpose)
+{
+    /*
+        ...
+    */
+    aes_cbc_TA("decrypt", tempvec, length);
+    /*
+        ...
+    */
+}
+</code></pre>
+<h4 id="7-使用加密權重在-tee-中執行推論"><a class="header" href="#7-使用加密權重在-tee-中執行推論">7. 使用加密權重在 TEE 中執行推論</a></h4>
+<p>重新啟動 qemu 運行 OP-TEE</p>
+<pre><code>cd ~/optee/build
+make run
+</code></pre>
+<p>執行 CA 進行推論</p>
+<pre><code># In normal world
+$ buildroot login: root
+$ darknetp classifier predict -pp_start 0 -pp_end 10 cfg/mnist.dataset cfg/mnist_lenet.cfg models/mnist/mnist_lenet_ta.weights  data/mnist/images/t_00007_c3.png
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="作業說明-2"><a class="header" href="#作業說明-2">作業說明</a></h1>
+<p>本次作業分為實作與簡答兩部分。繳交時，實作部分只需要截圖表示；回答問題時，需簡要說明答案思路。最後，將兩部分合併為一份 PDF，上傳至 eeclass。</p>
+<p>檔名格式請按照: <code>HW3_&lt;學號&gt;</code>。e.g. <code>HW3_113062595</code>。</p>
+<h2 id="題目"><a class="header" href="#題目">題目</a></h2>
+<h3 id="darknetz-實作"><a class="header" href="#darknetz-實作">DarkneTZ 實作</a></h3>
+<ul>
+<li>按照<a href="lab-3/build-darknetz.html">建置 DarkneTZ</a> 與<a href="lab-3/encrypt-weights.html">加密權重</a>的說明，分別在 REE 和 TEE 執行模型的推論，提供下面兩個命令的輸出截圖。</li>
+</ul>
+<pre><code>darknetp classifier predict cfg/mnist.dataset cfg/mnist_lenet.cfg models/mnist/mnist_lenet.weights  data/mnist/images/t_00007_c3.png
+</code></pre>
+<pre><code>darknetp classifier predict -pp_start 0 -pp_end 10 cfg/mnist.dataset cfg/mnist_lenet.cfg models/mnist/mnist_lenet_ta.weights  data/mnist/images/t_00007_c3.png
+</code></pre>
+<blockquote>
+<p>提示：參考截圖的輸出結果，檢查實作是否正確<br />
+REE
+<a href="https://postimg.cc/Q9cNqjFf"><img src="https://i.postimg.cc/63m7t3tx/jie-tu-2025-11-02-xia-wu6-28-33.png" alt="jie-tu-2025-11-02-xia-wu6-28-33.png" /></a>
+TEE
+<a href="https://postimg.cc/V01fG2My"><img src="https://i.postimg.cc/4yHYdgx3/jie-tu-2025-11-02-xia-wu6-28-46.png" alt="jie-tu-2025-11-02-xia-wu6-28-46.png" /></a></p>
+</blockquote>
+<h3 id="單選題"><a class="header" href="#單選題">單選題</a></h3>
+<p>根據 DarkneTZ <a href="https://dl.acm.org/doi/abs/10.1145/3386901.3388946">論文</a>，回答以下問題。</p>
+<ol>
+<li>
+<p>DarkneTZ 框架旨在邊緣設備上主要防禦哪一種利用模型洩露訓練數據資訊的攻擊？</p>
+<ol>
+<li>GAN 攻擊 (GAN Attacks)</li>
+<li>模型逆向工程攻擊 (Model Inversion Attacks)</li>
+<li>白盒模型成員推論攻擊 (Membership Inference Attacks, MIAs)</li>
+<li>黑盒模型成員推論攻擊 (Membership Inference Attacks, MIAs)</li>
+</ol>
+</li>
+<li>
+<p>考慮到邊緣 TEE (如 Arm TrustZone) 有限的記憶體，DarkneTZ 如何設計其模型執行策略以容納大型 DNN 模型？</p>
+<ol>
+<li>將模型分為敏感層與非敏感層，僅將敏感層執行於 TEE 中，非敏感層執行於 REE。</li>
+<li>採用剪枝和量化這些模型壓縮的技術來減少運行時的內存佔用。</li>
+<li>使用硬體加速器（如 GPU）來分擔 TEE 的計算負載與記憶體壓力。</li>
+<li>在 TEE 內實現分頁機制（Paging）以動態載入模型層次。</li>
+</ol>
+</li>
+<li>
+<p>根據論文，為了有效抵抗 MIA，DarkneTZ 優先保護 DNN 的哪一類層次？請指出其原因。</p>
+<ol>
+<li>所有非線性激活函數層，因為這些函數容易被逆向工程攻擊。</li>
+<li>網路的『第一層』，因為它們學習了關於輸入數據的通用但敏感的特徵。</li>
+<li>所有非線性層，因為線性層必須使用 REE 的加速器進行計算。</li>
+<li>網路的『最後一層』（輸出層），因為它們包含關於訓練數據的最高成員推論資訊。</li>
+</ol>
+</li>
+<li>
+<p>根據 DarkneTZ 的性能評估結果，僅保護『單一最關鍵層次』時，CPU 執行時間的額外性能開銷約為多少？</p>
+<ol>
+<li>超過 50%</li>
+<li>幾乎沒有開銷（小於 1%）</li>
+<li>約 3%</li>
+<li>約 10%</li>
+</ol>
+</li>
+</ol>
+<h3 id="簡答題"><a class="header" href="#簡答題">簡答題</a></h3>
+<ol>
+<li>
+<p>根據論文，雲端 TEE 解決方案（如 Intel SGX）與邊緣 TEE（如 Arm TrustZone）相比，存在哪三個主要的『環境差異』，使得雲端方案難以直接應用於邊緣設備？</p>
+</li>
+<li>
+<p>DarkneTZ 透過控制輸出資訊來防禦 MIA，除此之外，這項 TEE 隔離機制還能夠針對哪幾類型的攻擊提供額外的防護？</p>
+</li>
+</ol>
+<h3 id="加分題"><a class="header" href="#加分題">加分題</a></h3>
+<p>為鼓勵同學深入探討相關領域，並累積實作經驗，以「DarkneTZ 實作」題目為範例，提供下列幾個研究方向。建議同學參考相關論文或教學資源，重現前人提出的解決方案。在加分題的報告中，你只要簡單地介紹你採取的方案，然後著重在說明重現或部署的流程。</p>
+<ul>
+<li>重現 DarkneTZ 論文中的實驗，測量在 TEE 環境下運行模型時的 CPU 執行時間、記憶體使用量，以及處理器功耗。</li>
+<li>在利用 TEE 保護模型機密性的前提下，如何引入加速器（如 GPU 或專用硬體）來降低訓練與推論過程的時間成本？</li>
+<li>將模型移植至 TEE 系統的常見方法包括：切割並僅保護模型的部分層級、壓縮模型以減少資源需求、擴充 TEE 功能以支援原生模型運行。除了 DarkneTZ 的方案，還有什麼移植模型的方法？</li>
+<li>目前還有許多成熟 TEE 方案，如 Android pKVM、Linux CVM（包含 Intel TDX 與 AMD SEV），廠商也有公開釋出相關的 emulator 軟體，供開發者測試、使用。如何將模型部署至 OP-TEE 以外的這些系統中？</li>
+</ul>
 
                     </main>
 
