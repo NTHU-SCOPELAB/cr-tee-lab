@@ -55,7 +55,7 @@ jobs:
         run: |
           # Pull the source code
           mkdir ~/optee && cd ~/optee
-          yes | repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml
+          yes | repo init -u https://github.com/NTHU-SCOPELAB/cr-tee-manifest.git -m qemu_v8.xml
           repo sync -j4
           rm -rf optee_examples/aes
           mkdir -p ~/optee/build
